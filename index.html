@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Counterfactual Classifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 8px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e7e7e7;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Counterfactual Classifier</h1>
+        <textarea id="sentenceInput" placeholder="Enter your sentence here..."></textarea>
+        <button onclick="processSentence()">Classify Sentence</button>
+
+        <div id="result" class="result" style="display:none;">
+            <h3>Prediction Results:</h3>
+            <p id="counterfactualResult"></p>
+            <p id="directionResult"></p>
+            <p id="structureResult"></p>
+            <p id="actionTraitResult"></p>
+            <p id="controllabilityResult"></p>
+            <p id="specificityResult"></p>
+        </div>
+    </div>
+
+    <script>
+        function processSentence() {
+            const sentence = document.getElementById('sentenceInput').value;
+
+            if (!sentence) {
+                alert('Please enter a sentence.');
+                return;
+            }
+
+            // Sending the sentence to the backend for processing
+            fetch('/classify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ sentence: sentence })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Check if the response is valid
+                if (data && data.prediction) {
+                    const resultDiv = document.getElementById('result');
+                    const counterfactualResult = document.getElementById('counterfactualResult');
+                    const directionResult = document.getElementById('directionResult');
+                    const structureResult = document.getElementById('structureResult');
+                    const actionTraitResult = document.getElementById('actionTraitResult');
+                    const controllabilityResult = document.getElementById('controllabilityResult');
+                    const specificityResult = document.getElementById('specificityResult');
+
+                    const predictions = data.prediction.split(', ');
+
+                    // Counterfactual result
+                    const F1 = predictions[0].split(': ')[1];
+                    if (F1 === '0') {
+                        counterfactualResult.innerHTML = '<strong>Counterfactual check:</strong> This is not a counterfactual statement. Classification cannot be done.';
+                        directionResult.textContent = '';
+                        structureResult.textContent = '';
+                        actionTraitResult.textContent = '';
+                        controllabilityResult.textContent = '';
+                        specificityResult.textContent = '';
+                    } else {
+                        counterfactualResult.innerHTML = '<strong>Counterfactual check:</strong> This is a counterfactual statement.';
+
+                        // Direction result (LABEL2: up/down)
+                        const F2 = predictions[1].split(': ')[1];
+                        directionResult.innerHTML = `<strong>Direction:</strong> ${F2 === '1' ? 'This statement is upward' : 'This statement is downward'}`;
+
+                        // Structure result (LABEL3: ADD, SBST, SUB)
+                        const F3 = predictions[2].split(': ')[1];
+                        if (F3 === '0') {
+                            structureResult.innerHTML = '<strong>Structure:</strong> This statement is additive';
+                        } else if (F3 === '1') {
+                            structureResult.innerHTML = '<strong>Structure:</strong> This statement is a substitutive';
+                        } else if (F3 === '2') {
+                            structureResult.innerHTML = '<strong>Structure:</strong> This statement is subtractive';
+                        }
+
+                        // Action and Trait result (LABEL4: EXT PER, EXT SIT, INT BX, INT TR)
+                        const F4 = predictions[3].split(': ')[1];
+                        if (F4 === '0') {
+                            actionTraitResult.innerHTML = '<strong>Action and Trait:</strong> This statement relates to another person’s behaviors';
+                        } else if (F4 === '1') {
+                            actionTraitResult.innerHTML = '<strong>Action and Trait:</strong> This statement relates to the situation/circumstance';
+                        } else if (F4 === '2') {
+                            actionTraitResult.innerHTML = '<strong>Action and Trait:</strong> This statement related to behavior/action';
+                        } else if (F4 === '3') {
+                            actionTraitResult.innerHTML = '<strong>Action and Trait:</strong> This statement relates to trait/characteristic';
+                        }
+
+                        // Controlability result (LABEL5: C, NC)
+                        const F5 = predictions[4].split(': ')[1];
+                        controllabilityResult.innerHTML = `<strong>Controllability:</strong> ${F5 === '0' ? 'This statement is controllable' : 'This statement is non-controllable'}`;
+
+                        // Specificity result (LABEL6: N, Y)
+                        const F6 = predictions[5].split(': ')[1];
+                        specificityResult.innerHTML = `<strong>Specificity:</strong> ${F6 === '0' ? 'This statement is not specific' : 'This statement is specific'}`;
+                    }
+
+                    resultDiv.style.display = 'block';
+                } else {
+                    alert('No prediction result received.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('There was an error processing your request.');
+            });
+        }
+    </script>
+
+</body>
+</html>
